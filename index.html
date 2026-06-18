@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子艺术生成器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="control-panel">
+            <h1>粒子艺术生成器</h1>
+            
+            <div class="control-group">
+                <h2>预设模式</h2>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" data-mode="starfield">星空</button>
+                    <button class="mode-btn" data-mode="fireworks">烟花</button>
+                    <button class="mode-btn" data-mode="waterflow">水流</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h2>粒子数量</h2>
+                <input type="range" id="particleCount" min="50" max="500" value="200" step="10">
+                <span class="value-display" id="countValue">200</span>
+            </div>
+
+            <div class="control-group">
+                <h2>粒子颜色</h2>
+                <input type="color" id="particleColor" value="#00ffff">
+            </div>
+
+            <div class="control-group">
+                <h2>粒子速度</h2>
+                <input type="range" id="particleSpeed" min="0.1" max="5" value="1" step="0.1">
+                <span class="value-display" id="speedValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <h2>粒子大小</h2>
+                <input type="range" id="particleSize" min="1" max="10" value="3" step="0.5">
+                <span class="value-display" id="sizeValue">3.0</span>
+            </div>
+
+            <div class="control-group">
+                <h2>鼠标交互</h2>
+                <div class="mode-buttons">
+                    <button class="interaction-btn active" data-interaction="attract">跟随</button>
+                    <button class="interaction-btn" data-interaction="repel">散开</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h2>发光强度</h2>
+                <input type="range" id="glowIntensity" min="0" max="30" value="15" step="1">
+                <span class="value-display" id="glowValue">15</span>
+            </div>
+
+            <div class="control-group">
+                <button id="screenshotBtn" class="screenshot-btn">📸 保存截图</button>
+            </div>
+
+            <div class="control-group">
+                <button id="resetBtn" class="reset-btn">重置参数</button>
+            </div>
+        </aside>
+
+        <main class="canvas-container">
+            <canvas id="particleCanvas"></canvas>
+        </main>
+    </div>
+
+    <script src="particles.js"></script>
+</body>
+</html>
