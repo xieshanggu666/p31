@@ -199,6 +199,7 @@ input[type="color"]::-webkit-color-swatch {
 }
 
 .screenshot-btn,
+.record-gif-btn,
 .reset-btn {
     width: 100%;
     padding: 14px;
@@ -224,6 +225,41 @@ input[type="color"]::-webkit-color-swatch {
 
 .screenshot-btn:active {
     transform: translateY(0);
+}
+
+.record-gif-btn {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+}
+
+.record-gif-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+}
+
+.record-gif-btn:active {
+    transform: translateY(0);
+}
+
+.record-gif-btn.recording {
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    animation: pulse-record 0.8s infinite;
+}
+
+@keyframes pulse-record {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 35px rgba(255, 0, 0, 0.8);
+    }
+}
+
+.record-gif-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .reset-btn {

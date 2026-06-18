@@ -1,3 +1,361 @@
+class GIFEncoder {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.frames = [];
+        this.delay = 10;
+        this.transparent = null;
+        this.transparentIndex = 0;
+        this.colorDepth = 8;
+        this.palette = [];
+        this.usedEntry = new Array(256);
+        this.pixelCount = width * height;
+        this.indexedPixels = new Uint8Array(this.pixelCount);
+    }
+
+    setDelay(ms) {
+        this.delay = Math.round(ms / 10);
+    }
+
+    addFrame(imageData) {
+        if (!this.getImagePixels(imageData)) return false;
+        this.analyzePixels();
+        if (this.frames.length === 0) {
+            this.writeLSD();
+            this.writePalette();
+            if (this.transparent !== null) {
+                this.writeNetscapeExt();
+            }
+        }
+        this.writeGraphicCtrlExt();
+        this.writeImageDesc();
+        if (this.firstFrame) {
+            this.writePalette();
+        }
+        this.writePixels();
+        this.firstFrame = false;
+        return true;
+    }
+
+    getImagePixels(imageData) {
+        this.pixels = new Uint8Array(imageData.data);
+        return true;
+    }
+
+    analyzePixels() {
+        const nPix = this.pixelCount;
+        const indexedPixels = new Uint8Array(nPix);
+
+        const { palette: colorTab, depth } = this.buildColorTable();
+        this.palette = colorTab;
+
+        const colorMap = this.findClosest(colorTab);
+
+        for (let i = 0; i < nPix; i++) {
+            const idx = i * 4;
+            const r = this.pixels[idx] >> 3;
+            const g = this.pixels[idx + 1] >> 3;
+            const b = this.pixels[idx + 2] >> 3;
+            const mapIdx = (r << 10) | (g << 5) | b;
+            indexedPixels[i] = colorMap[mapIdx];
+        }
+
+        this.indexedPixels = indexedPixels;
+        this.colorDepth = depth;
+    }
+
+    buildColorTable() {
+        const len = this.pixels.length;
+        const colorFreq = new Int32Array(65536);
+
+        const step = 4;
+        const rShift = 3;
+        const gShift = 3;
+        const bShift = 3;
+
+        for (let i = 0; i < len; i += step) {
+            const pixel = ((this.pixels[i] >> rShift) << 10)
+                | ((this.pixels[i + 1] >> gShift) << 5)
+                | (this.pixels[i + 2] >> bShift);
+            colorFreq[pixel]++;
+        }
+
+        const usedColors = [];
+        for (let i = 0; i < 65536; i++) {
+            if (colorFreq[i] > 0) {
+                usedColors.push({ color: i, freq: colorFreq[i] });
+            }
+        }
+
+        usedColors.sort((a, b) => b.freq - a.freq);
+
+        const palette = [];
+        const maxColors = 256;
+        for (let i = 0; i < Math.min(usedColors.length, maxColors); i++) {
+            const c = usedColors[i].color;
+            const r = ((c >> 10) & 31) << rShift;
+            const g = ((c >> 5) & 31) << gShift;
+            const b = (c & 31) << bShift;
+            palette.push(r, g, b);
+        }
+
+        while (palette.length < maxColors * 3) {
+            palette.push(0, 0, 0);
+        }
+
+        return { palette, depth: 8 };
+    }
+
+    findClosest(palette) {
+        const rShift = 3;
+        const mapSize = 256 * 256 * 256;
+        const rShift2 = 5;
+        const rShift3 = 2;
+        const colorMap = new Uint8Array(32 * 32 * 32);
+
+        for (let i = 0; i < 32; i++) {
+            for (let j = 0; j < 32; j++) {
+                for (let k = 0; k < 32; k++) {
+                    const index = (i << 10) | (j << 5) | k;
+                    const r = i << rShift;
+                    const g = j << rShift;
+                    const b = k << rShift;
+                    let minDist = Infinity;
+                    let bestIdx = 0;
+                    for (let p = 0; p < 256; p++) {
+                        const dr = r - palette[p * 3];
+                        const dg = g - palette[p * 3 + 1];
+                        const db = b - palette[p * 3 + 2];
+                        const d = dr * dr + dg * dg + db * db;
+                        if (d < minDist) {
+                            minDist = d;
+                            bestIdx = p;
+                        }
+                    }
+                    colorMap[index] = bestIdx;
+                }
+            }
+        }
+
+        return colorMap;
+    }
+
+    writeLSD() {
+        this.writeShort(this.width);
+        this.writeShort(this.height);
+        this.writeByte(0xf7);
+        this.writeByte(0);
+        this.writeByte(0);
+    }
+
+    writePalette() {
+        for (let i = 0; i < 768; i++) {
+            this.writeByte(this.palette[i]);
+        }
+    }
+
+    writeNetscapeExt() {
+        this.writeByte(0x21);
+        this.writeByte(0xff);
+        this.writeByte(11);
+        for (const c of [78, 69, 84, 83, 67, 65, 80, 69, 50, 46, 48]) {
+            this.writeByte(c);
+        }
+        this.writeByte(3);
+        this.writeByte(1);
+        this.writeShort(0);
+        this.writeByte(0);
+    }
+
+    writeGraphicCtrlExt() {
+        this.writeByte(0x21);
+        this.writeByte(0xf9);
+        this.writeByte(4);
+        this.writeByte(0);
+        this.writeShort(this.delay);
+        this.writeByte(this.transparentIndex);
+        this.writeByte(0);
+    }
+
+    writeImageDesc() {
+        this.writeByte(0x2c);
+        this.writeShort(0);
+        this.writeShort(0);
+        this.writeShort(this.width);
+        this.writeShort(this.height);
+        this.writeByte(0);
+    }
+
+    writePixels() {
+        const enc = this.lzwEncode(this.width, this.height, this.indexedPixels);
+        this.writeByte(Math.min(this.colorDepth, 8));
+        let idx = 0;
+        while (idx < enc.length) {
+            let blockLen = Math.min(255, enc.length - idx);
+            this.writeByte(blockLen);
+            for (let i = 0; i < blockLen; i++) {
+                this.writeByte(enc[idx++]);
+            }
+        }
+        this.writeByte(0);
+    }
+
+    lzwEncode(width, height, pixels) {
+        const BITS = 12;
+        const HSIZE = 5003;
+        const nBits = 8;
+        const clear = 1 << nBits;
+        const eofCode = clear + 1;
+        let freeEntry = clear + 2;
+        let codeSize = nBits + 1;
+        let highBit = 1 << codeSize;
+        let maxCode = highBit - 1;
+
+        const hTab = new Int32Array(HSIZE);
+        const codTab = new Int32Array(HSIZE);
+        hTab.fill(-1);
+
+        const remaining = width * height;
+        let curPixel = 0;
+        let ent = pixels[curPixel++];
+
+        const output = [];
+        let bitOffset = 0;
+        let current = 0;
+        let blockSize = 0;
+        const blocks = [];
+        let accum = [];
+        let accLength = 0;
+
+        const writeCode = (code, size) => {
+            while (size > 0) {
+                accum.push((code >> 0) & 1);
+                code >>= 1;
+                size--;
+                accLength++;
+                if (accLength === 8) {
+                    let byte = 0;
+                    for (let i = 0; i < 8; i++) {
+                        byte |= accum[i] << i;
+                    }
+                    blocks.push(byte);
+                    blockSize++;
+                    accum = [];
+                    accLength = 0;
+                    if (blockSize === 255) {
+                        output.push(blockSize);
+                        for (const b of blocks) output.push(b);
+                        blocks.length = 0;
+                        blockSize = 0;
+                    }
+                }
+            }
+        };
+
+        writeCode(clear, codeSize);
+
+        while (curPixel < remaining) {
+            const c = pixels[curPixel++];
+            const fcode = (c << BITS) + ent;
+            let h = (c << 4) ^ ent;
+            let h2 = 2003 - (h % 2003);
+            let found = false;
+
+            while (true) {
+                if (hTab[h] === fcode) {
+                    ent = codTab[h];
+                    found = true;
+                    break;
+                }
+                if (hTab[h] < 0) break;
+                h -= h2;
+                if (h < 0) h += HSIZE;
+            }
+
+            if (!found) {
+                writeCode(ent, codeSize);
+                ent = c;
+                if (freeEntry < (1 << BITS)) {
+                    hTab[h] = fcode;
+                    codTab[h] = freeEntry++;
+                    if (freeEntry > maxCode) {
+                        codeSize++;
+                        highBit <<= 1;
+                        maxCode = highBit - 1;
+                    }
+                } else {
+                    writeCode(clear, codeSize);
+                    freeEntry = clear + 2;
+                    codeSize = nBits + 1;
+                    highBit = 1 << codeSize;
+                    maxCode = highBit - 1;
+                    hTab.fill(-1);
+                }
+            }
+        }
+
+        writeCode(ent, codeSize);
+        writeCode(eofCode, codeSize);
+
+        if (accLength > 0) {
+            while (accLength < 8) {
+                accum.push(0);
+                accLength++;
+            }
+            let byte = 0;
+            for (let i = 0; i < 8; i++) byte |= accum[i] << i;
+            blocks.push(byte);
+            blockSize++;
+        }
+
+        if (blockSize > 0) {
+            output.push(blockSize);
+            for (const b of blocks) output.push(b);
+        }
+
+        return new Uint8Array(output);
+    }
+
+    writeByte(b) {
+        this.stream.push(b & 0xff);
+    }
+
+    writeShort(s) {
+        this.writeByte(s & 0xff);
+        this.writeByte((s >> 8) & 0xff);
+    }
+
+    start() {
+        this.stream = [];
+        this.firstFrame = true;
+        this.writeString('GIF89a');
+    }
+
+    writeString(s) {
+        for (let i = 0; i < s.length; i++) {
+            this.writeByte(s.charCodeAt(i));
+        }
+    }
+
+    finish() {
+        this.writeByte(0x3b);
+    }
+
+    getBlob() {
+        this.finish();
+        return new Blob([new Uint8Array(this.stream)], { type: 'image/gif' });
+    }
+
+    getDataURL() {
+        this.finish();
+        let binary = '';
+        for (let i = 0; i < this.stream.length; i++) {
+            binary += String.fromCharCode(this.stream[i]);
+        }
+        return 'data:image/gif;base64,' + btoa(binary);
+    }
+}
+
 class PerlinNoise {
     constructor(seed = Math.random()) {
         this.p = new Uint8Array(512);
@@ -837,15 +1195,14 @@ class ParticleSystem {
         const radius = this.mouseInteractionRadius;
 
         if (this.interaction === 'draw') {
-            this.ctx.setLineDash([8, 6]);
-            this.ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
-            this.ctx.stroke();
-
-            this.ctx.setLineDash([]);
-            this.ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
+            const gradient = this.ctx.createRadialGradient(
+                this.mouseX, this.mouseY, 0,
+                this.mouseX, this.mouseY, radius
+            );
+            gradient.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+            gradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.1)');
+            gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+            this.ctx.fillStyle = gradient;
             this.ctx.beginPath();
             this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
             this.ctx.fill();
@@ -854,35 +1211,25 @@ class ParticleSystem {
                 this.mouseX, this.mouseY, 0,
                 this.mouseX, this.mouseY, radius
             );
-            gradient.addColorStop(0, 'rgba(0, 255, 200, 0.15)');
+            gradient.addColorStop(0, 'rgba(0, 255, 200, 0.2)');
+            gradient.addColorStop(0.5, 'rgba(0, 255, 200, 0.1)');
             gradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
             this.ctx.fillStyle = gradient;
             this.ctx.beginPath();
             this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
             this.ctx.fill();
-
-            this.ctx.strokeStyle = 'rgba(0, 255, 200, 0.5)';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
-            this.ctx.stroke();
         } else if (this.interaction === 'repel') {
             const gradient = this.ctx.createRadialGradient(
                 this.mouseX, this.mouseY, 0,
                 this.mouseX, this.mouseY, radius
             );
-            gradient.addColorStop(0, 'rgba(255, 100, 50, 0.15)');
+            gradient.addColorStop(0, 'rgba(255, 100, 50, 0.2)');
+            gradient.addColorStop(0.5, 'rgba(255, 100, 50, 0.1)');
             gradient.addColorStop(1, 'rgba(255, 50, 100, 0)');
             this.ctx.fillStyle = gradient;
             this.ctx.beginPath();
             this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
             this.ctx.fill();
-
-            this.ctx.strokeStyle = 'rgba(255, 120, 50, 0.5)';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
-            this.ctx.stroke();
         }
 
         this.ctx.restore();
@@ -1178,6 +1525,37 @@ class ParticleSystem {
         const dataURL = this.canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = `particle-art-${Date.now()}.png`;
+        link.href = dataURL;
+        link.click();
+    }
+
+    async recordGif(duration = 3000, frameInterval = 100, onProgress) {
+        const totalFrames = Math.floor(duration / frameInterval);
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const encoder = new GIFEncoder(width, height);
+        encoder.start();
+        encoder.setDelay(frameInterval);
+
+        const captureFrame = () => {
+            return new Promise((resolve) => {
+                const imageData = this.ctx.getImageData(0, 0, width, height);
+                encoder.addFrame(imageData);
+                resolve();
+            });
+        };
+
+        for (let i = 0; i < totalFrames; i++) {
+            await captureFrame();
+            if (onProgress) {
+                onProgress(i + 1, totalFrames);
+            }
+            await new Promise(resolve => setTimeout(resolve, frameInterval));
+        }
+
+        const dataURL = encoder.getDataURL();
+        const link = document.createElement('a');
+        link.download = `particle-animation-${Date.now()}.gif`;
         link.href = dataURL;
         link.click();
     }
@@ -1631,6 +2009,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     screenshotBtn.addEventListener('click', () => {
         system.takeScreenshot();
+    });
+
+    const recordGifBtn = document.getElementById('recordGifBtn');
+    let isRecording = false;
+
+    recordGifBtn.addEventListener('click', async () => {
+        if (isRecording) return;
+        isRecording = true;
+        recordGifBtn.disabled = true;
+        recordGifBtn.classList.add('recording');
+        const originalText = recordGifBtn.textContent;
+
+        try {
+            await system.recordGif(3000, 100, (current, total) => {
+                recordGifBtn.textContent = `🎬 录制中 ${current}/${total}`;
+            });
+        } catch (e) {
+            console.error('GIF录制失败:', e);
+            alert('GIF录制失败: ' + e.message);
+        } finally {
+            isRecording = false;
+            recordGifBtn.disabled = false;
+            recordGifBtn.classList.remove('recording');
+            recordGifBtn.textContent = originalText;
+        }
     });
 
     resetBtn.addEventListener('click', () => {
