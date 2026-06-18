@@ -80,9 +80,18 @@ class Particle {
                 if (this.y > canvasHeight + 50) {
                     this.y = -50;
                     this.x = Math.random() * canvasWidth;
+                    this.tail = [];
+                    this.vx = (Math.random() - 0.5) * 1;
+                    this.vy = Math.random() * 2 + 1;
                 }
-                if (this.x < -50) this.x = canvasWidth + 50;
-                if (this.x > canvasWidth + 50) this.x = -50;
+                if (this.x < -50) {
+                    this.x = canvasWidth + 50;
+                    this.tail = [];
+                }
+                if (this.x > canvasWidth + 50) {
+                    this.x = -50;
+                    this.tail = [];
+                }
                 break;
         }
     }
@@ -91,13 +100,25 @@ class Particle {
         ctx.save();
         
         if (this.tail.length > 1) {
+            if (this.glow > 0) {
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = this.glow * 0.5;
+            }
             ctx.beginPath();
             ctx.moveTo(this.tail[0].x, this.tail[0].y);
             for (let i = 1; i < this.tail.length; i++) {
-                ctx.lineTo(this.tail[i].x, this.tail[i].y);
+                const prev = this.tail[i - 1];
+                const curr = this.tail[i];
+                const dx = curr.x - prev.x;
+                const dy = curr.y - prev.y;
+                if (dx * dx + dy * dy < 10000) {
+                    ctx.lineTo(curr.x, curr.y);
+                } else {
+                    ctx.moveTo(curr.x, curr.y);
+                }
             }
-            ctx.strokeStyle = this.hexToRgba(this.color, this.alpha * 0.3);
-            ctx.lineWidth = this.size * 0.5;
+            ctx.strokeStyle = this.hexToRgba(this.color, this.alpha * 0.4);
+            ctx.lineWidth = this.size * 0.6;
             ctx.lineCap = 'round';
             ctx.stroke();
         }
@@ -146,6 +167,7 @@ class ParticleSystem {
         this.animationId = null;
         this.lastFireworkTime = 0;
         this.fireworkInterval = 60;
+        this.maxFireworkParticles = 500;
 
         this.resize();
         this.initParticles();
@@ -196,24 +218,25 @@ class ParticleSystem {
     }
 
     createFireworksParticles() {
-        for (let i = 0; i < this.particleCount; i++) {
-            if (Math.random() < 0.3) {
-                this.launchFirework();
-            }
+        const targetParticles = Math.min(this.particleCount, this.maxFireworkParticles);
+        const particlesPerFirework = Math.max(15, Math.floor(30 * (500 / Math.max(this.particleCount, 200))));
+        while (this.particles.length < targetParticles * 0.3) {
+            this.launchFirework(particlesPerFirework);
         }
     }
 
-    launchFirework() {
+    launchFirework(customCount) {
+        if (this.particles.length >= this.maxFireworkParticles) return;
+        
         const startX = Math.random() * this.canvas.width;
-        const startY = this.canvas.height;
         const targetY = Math.random() * this.canvas.height * 0.5 + 50;
-        const particlesPerFirework = 30;
+        const particlesPerFirework = customCount || Math.max(15, Math.floor(30 * (500 / Math.max(this.particleCount, 200))));
         const hue = Math.random() * 360;
-        const color = `hsl(${hue}, 100%, 60%)`;
         const hexColor = this.hslToHex(hue, 100, 60);
+        const actualCount = Math.min(particlesPerFirework, this.maxFireworkParticles - this.particles.length);
 
-        for (let i = 0; i < particlesPerFirework; i++) {
-            const angle = (Math.PI * 2 * i) / particlesPerFirework;
+        for (let i = 0; i < actualCount; i++) {
+            const angle = (Math.PI * 2 * i) / actualCount;
             const speed = Math.random() * 3 + 2;
             const particle = new Particle(startX, targetY, {
                 vx: Math.cos(angle) * speed,
@@ -224,7 +247,7 @@ class ParticleSystem {
                 maxLife: 1,
                 mode: 'fireworks',
                 glow: this.glowIntensity,
-                tailLength: 8
+                tailLength: 6
             });
             this.particles.push(particle);
         }
@@ -243,7 +266,7 @@ class ParticleSystem {
                     mode: 'waterflow',
                     glow: this.glowIntensity,
                     alpha: Math.random() * 0.6 + 0.4,
-                    tailLength: 12
+                    tailLength: 10
                 }
             );
             this.particles.push(particle);
@@ -300,13 +323,15 @@ class ParticleSystem {
     update() {
         if (this.mode === 'fireworks') {
             this.lastFireworkTime++;
-            if (this.lastFireworkTime >= this.fireworkInterval) {
+            const dynamicInterval = Math.max(30, this.fireworkInterval - Math.floor(this.particleCount / 50));
+            if (this.lastFireworkTime >= dynamicInterval && this.particles.length < this.maxFireworkParticles) {
                 this.launchFirework();
                 this.lastFireworkTime = 0;
             }
         }
 
-        for (let i = this.particles.length - 1; i >= 0; i--) {
+        const aliveParticles = [];
+        for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             p.update(
                 this.particleSpeed,
@@ -318,10 +343,11 @@ class ParticleSystem {
                 this.mode
             );
 
-            if (p.isDead()) {
-                this.particles.splice(i, 1);
+            if (!p.isDead()) {
+                aliveParticles.push(p);
             }
         }
+        this.particles = aliveParticles;
 
         if (this.mode !== 'fireworks') {
             while (this.particles.length < this.particleCount) {
