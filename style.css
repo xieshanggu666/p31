@@ -160,6 +160,44 @@ input[type="color"]::-webkit-color-swatch {
     box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
 }
 
+.sub-control {
+    margin-bottom: 14px;
+}
+
+.sub-control:last-child {
+    margin-bottom: 0;
+}
+
+.sub-control label {
+    display: block;
+    font-size: 12px;
+    color: #88ccff;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+.mode-desc {
+    font-size: 12px;
+    color: #aabbcc;
+    line-height: 1.6;
+    opacity: 0.8;
+}
+
+.mode-specific-panel {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .screenshot-btn,
 .reset-btn {
     width: 100%;

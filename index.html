@@ -17,6 +17,9 @@
                     <button class="mode-btn active" data-mode="starfield">星空</button>
                     <button class="mode-btn" data-mode="fireworks">烟花</button>
                     <button class="mode-btn" data-mode="waterflow">水流</button>
+                    <button class="mode-btn" data-mode="wave">波浪</button>
+                    <button class="mode-btn" data-mode="fractal">分形</button>
+                    <button class="mode-btn" data-mode="flowfield">流场</button>
                 </div>
             </div>
 
@@ -55,6 +58,78 @@
                 <h2>发光强度</h2>
                 <input type="range" id="glowIntensity" min="0" max="30" value="15" step="1">
                 <span class="value-display" id="glowValue">15</span>
+            </div>
+
+            <div id="panel-wave" class="control-group mode-specific-panel" style="display:none;">
+                <h2>🌊 波浪参数</h2>
+                <div class="sub-control">
+                    <label>频率</label>
+                    <input type="range" id="waveFrequency" min="0.001" max="0.03" value="0.008" step="0.0005">
+                    <span class="value-display" id="waveFreqValue">0.0080</span>
+                </div>
+                <div class="sub-control">
+                    <label>振幅</label>
+                    <input type="range" id="waveAmplitude" min="10" max="150" value="60" step="5">
+                    <span class="value-display" id="waveAmpValue">60</span>
+                </div>
+                <div class="sub-control">
+                    <label>层数</label>
+                    <input type="range" id="waveLayers" min="1" max="8" value="4" step="1">
+                    <span class="value-display" id="waveLayersValue">4</span>
+                </div>
+            </div>
+
+            <div id="panel-fractal" class="control-group mode-specific-panel" style="display:none;">
+                <h2>🌳 分形参数</h2>
+                <div class="sub-control">
+                    <label>递归深度</label>
+                    <input type="range" id="fractalDepth" min="3" max="12" value="8" step="1">
+                    <span class="value-display" id="fractalDepthValue">8</span>
+                </div>
+                <div class="sub-control">
+                    <label>分支角度 (弧度)</label>
+                    <input type="range" id="fractalBranchAngle" min="0.1" max="1.2" value="0.5" step="0.05">
+                    <span class="value-display" id="fractalAngleValue">0.50</span>
+                </div>
+                <div class="sub-control">
+                    <label>长度衰减比</label>
+                    <input type="range" id="fractalLengthRatio" min="0.4" max="0.85" value="0.67" step="0.01">
+                    <span class="value-display" id="fractalRatioValue">0.67</span>
+                </div>
+            </div>
+
+            <div id="panel-flowfield" class="control-group mode-specific-panel" style="display:none;">
+                <h2>🌀 流场参数</h2>
+                <div class="sub-control">
+                    <label>噪声缩放</label>
+                    <input type="range" id="flowScale" min="0.001" max="0.015" value="0.004" step="0.0005">
+                    <span class="value-display" id="flowScaleValue">0.0040</span>
+                </div>
+                <div class="sub-control">
+                    <label>推力强度</label>
+                    <input type="range" id="flowForce" min="0.05" max="1.0" value="0.25" step="0.05">
+                    <span class="value-display" id="flowForceValue">0.25</span>
+                </div>
+                <div class="sub-control">
+                    <label>演化速度</label>
+                    <input type="range" id="flowSpeed" min="0.1" max="2.0" value="0.7" step="0.1">
+                    <span class="value-display" id="flowSpeedValue">0.70</span>
+                </div>
+            </div>
+
+            <div id="panel-starfield" class="control-group mode-specific-panel" style="display:none;">
+                <h2>✨ 星空模式</h2>
+                <p class="mode-desc">经典粒子随机漂浮效果，可使用通用参数调节。</p>
+            </div>
+
+            <div id="panel-fireworks" class="control-group mode-specific-panel" style="display:none;">
+                <h2>🎆 烟花模式</h2>
+                <p class="mode-desc">定时绽放的彩色粒子烟花，可使用通用参数调节。</p>
+            </div>
+
+            <div id="panel-waterflow" class="control-group mode-specific-panel" style="display:none;">
+                <h2>💧 水流模式</h2>
+                <p class="mode-desc">模拟水流动画的下落粒子效果，可使用通用参数调节。</p>
             </div>
 
             <div class="control-group">
