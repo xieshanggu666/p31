@@ -69,7 +69,7 @@ class Particle {
     update(speed, mouseX, mouseY, interaction, canvasWidth, canvasHeight, mode, modeParams) {
         this.speedMultiplier = speed;
         
-        if (mouseX !== null && mouseY !== null) {
+        if (this.mode !== 'trail' && mouseX !== null && mouseY !== null) {
             const dx = mouseX - this.x;
             const dy = mouseY - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -89,14 +89,23 @@ class Particle {
             }
         }
 
-        this.updateByMode(mode, canvasWidth, canvasHeight, modeParams || {});
-
-        this.vx *= 0.98;
-        this.vy *= 0.98;
-
-        if (mode !== 'wave') {
+        if (this.mode === 'trail') {
+            this.life -= 1 / 60;
+            this.alpha = Math.max(0, this.life / this.maxLife);
+            this.vx *= 0.96;
+            this.vy *= 0.96;
             this.x += this.vx * speed;
             this.y += this.vy * speed;
+        } else {
+            this.updateByMode(mode, canvasWidth, canvasHeight, modeParams || {});
+
+            this.vx *= 0.98;
+            this.vy *= 0.98;
+
+            if (mode !== 'wave') {
+                this.x += this.vx * speed;
+                this.y += this.vy * speed;
+            }
         }
 
         if (this.tailLength > 0) {
@@ -283,6 +292,12 @@ class ParticleSystem {
         this.colorTheme = 'cool';
         this.linkDistance = 0;
         this.fadeOut = 0.15;
+        this.mouseInteractionRadius = 150;
+        this.trailParticles = [];
+        this.lastMouseX = null;
+        this.lastMouseY = null;
+        this.isMouseDown = false;
+        this.maxTrailParticles = 1000;
 
         this.themeColors = {
             cool: ['#00ffff', '#00aaff', '#0066ff', '#66ccff', '#3399ff', '#00ccff'],
@@ -306,6 +321,7 @@ class ParticleSystem {
 
     initParticles() {
         this.particles = [];
+        this.trailParticles = [];
         this.time = 0;
         this.fractalAnimProgress = 0;
         this.fractalLines = [];
@@ -554,17 +570,62 @@ class ParticleSystem {
             const rect = this.canvas.getBoundingClientRect();
             this.mouseX = e.clientX - rect.left;
             this.mouseY = e.clientY - rect.top;
+
+            if (this.interaction === 'draw') {
+                this.spawnTrailParticle(this.mouseX, this.mouseY);
+            }
+
+            this.lastMouseX = this.mouseX;
+            this.lastMouseY = this.mouseY;
+        });
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.isMouseDown = true;
+            if (this.interaction === 'draw') {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                this.spawnTrailParticle(x, y);
+            }
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            this.isMouseDown = false;
         });
 
         this.canvas.addEventListener('mouseleave', () => {
             this.mouseX = null;
             this.mouseY = null;
+            this.lastMouseX = null;
+            this.lastMouseY = null;
+            this.isMouseDown = false;
         });
 
         window.addEventListener('resize', () => {
             this.resize();
             this.initParticles();
         });
+    }
+
+    spawnTrailParticle(x, y) {
+        if (this.trailParticles.length >= this.maxTrailParticles) {
+            this.trailParticles.shift();
+        }
+
+        const life = 2 + Math.random() * 3;
+        const particle = new Particle(x, y, {
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: (Math.random() - 0.5) * 1.5,
+            size: Math.random() * this.particleSize * 0.5 + this.particleSize * 0.5,
+            color: this.getThemeColor(),
+            life: life,
+            maxLife: life,
+            mode: 'trail',
+            glow: this.glowIntensity,
+            alpha: 1,
+            tailLength: 5
+        });
+        this.trailParticles.push(particle);
     }
 
     update() {
@@ -631,6 +692,25 @@ class ParticleSystem {
             }
         }
         this.particles = aliveParticles;
+
+        const aliveTrailParticles = [];
+        for (let i = 0; i < this.trailParticles.length; i++) {
+            const p = this.trailParticles[i];
+            p.update(
+                this.particleSpeed,
+                this.mouseX,
+                this.mouseY,
+                this.interaction,
+                this.canvas.width,
+                this.canvas.height,
+                this.mode,
+                modeParams
+            );
+            if (!p.isDead()) {
+                aliveTrailParticles.push(p);
+            }
+        }
+        this.trailParticles = aliveTrailParticles;
 
         if (this.mode !== 'fireworks' && this.mode !== 'fractal') {
             while (this.particles.length < this.particleCount) {
@@ -741,6 +821,71 @@ class ParticleSystem {
             particle.glow = this.glowIntensity;
             particle.draw(this.ctx);
         }
+
+        for (const particle of this.trailParticles) {
+            particle.glow = this.glowIntensity;
+            particle.draw(this.ctx);
+        }
+
+        this.drawMouseIndicator();
+    }
+
+    drawMouseIndicator() {
+        if (this.mouseX === null || this.mouseY === null) return;
+
+        this.ctx.save();
+        const radius = this.mouseInteractionRadius;
+
+        if (this.interaction === 'draw') {
+            this.ctx.setLineDash([8, 6]);
+            this.ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+
+            this.ctx.setLineDash([]);
+            this.ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        } else if (this.interaction === 'attract') {
+            const gradient = this.ctx.createRadialGradient(
+                this.mouseX, this.mouseY, 0,
+                this.mouseX, this.mouseY, radius
+            );
+            gradient.addColorStop(0, 'rgba(0, 255, 200, 0.15)');
+            gradient.addColorStop(1, 'rgba(0, 200, 255, 0)');
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = 'rgba(0, 255, 200, 0.5)';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+        } else if (this.interaction === 'repel') {
+            const gradient = this.ctx.createRadialGradient(
+                this.mouseX, this.mouseY, 0,
+                this.mouseX, this.mouseY, radius
+            );
+            gradient.addColorStop(0, 'rgba(255, 100, 50, 0.15)');
+            gradient.addColorStop(1, 'rgba(255, 50, 100, 0)');
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = 'rgba(255, 120, 50, 0.5)';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(this.mouseX, this.mouseY, radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+
+        this.ctx.restore();
     }
 
     drawLinks() {
