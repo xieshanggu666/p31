@@ -238,6 +238,255 @@ input[type="color"]::-webkit-color-swatch {
     color: #ffaaaa;
 }
 
+.theme-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 10px 8px;
+    font-size: 12px;
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #aaccff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.theme-btn:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: rgba(0, 255, 255, 0.5);
+    color: #ffffff;
+}
+
+.theme-btn.active {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(255, 0, 255, 0.2));
+    border-color: #00ffff;
+    color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+.preset-section h2 {
+    margin-bottom: 16px;
+}
+
+.preset-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.preset-save-btn,
+.preset-random-btn {
+    flex: 1;
+    padding: 12px;
+    font-size: 13px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.preset-save-btn {
+    background: linear-gradient(135deg, #00ff88, #00cc66);
+    color: #000;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+}
+
+.preset-save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.4);
+}
+
+.preset-random-btn {
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.2);
+}
+
+.preset-random-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(255, 107, 107, 0.4);
+}
+
+.save-preset-input {
+    margin-bottom: 16px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.save-preset-input input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #ffffff;
+    font-family: inherit;
+    margin-bottom: 10px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.save-preset-input input[type="text"]:focus {
+    border-color: #00ffff;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.save-preset-input input[type="text"]::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.preset-input-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.preset-confirm-btn,
+.preset-cancel-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.preset-confirm-btn {
+    background: linear-gradient(135deg, #00ff88, #00cc66);
+    color: #000;
+}
+
+.preset-confirm-btn:hover {
+    transform: scale(1.02);
+}
+
+.preset-cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #aaccff;
+}
+
+.preset-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.preset-list-container h3 {
+    font-size: 13px;
+    font-weight: 500;
+    color: #88ccff;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+.preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.preset-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.preset-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
+
+.preset-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.preset-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 255, 0.5);
+}
+
+.preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(100, 200, 255, 0.15);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-item:hover {
+    background: rgba(0, 255, 255, 0.08);
+    border-color: rgba(0, 255, 255, 0.4);
+}
+
+.preset-item.active {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.15), rgba(255, 0, 255, 0.15));
+    border-color: #00ffff;
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+}
+
+.preset-item.active .preset-name {
+    color: #00ffff;
+    font-weight: bold;
+}
+
+.preset-name {
+    flex: 1;
+    font-size: 13px;
+    color: #e0e0e0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preset-delete-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 80, 80, 0.1);
+    color: #ff6666;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.preset-delete-btn:hover {
+    background: rgba(255, 80, 80, 0.3);
+    color: #ff4444;
+    transform: scale(1.1);
+}
+
+.empty-preset {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+}
+
 .canvas-container {
     flex: 1;
     position: relative;

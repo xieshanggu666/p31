@@ -30,8 +30,30 @@
             </div>
 
             <div class="control-group">
-                <h2>粒子颜色</h2>
+                <h2>颜色主题</h2>
+                <div class="mode-buttons">
+                    <button class="theme-btn active" data-theme="cool">❄️ 冷色</button>
+                    <button class="theme-btn" data-theme="warm">🔥 暖色</button>
+                    <button class="theme-btn" data-theme="neon">🌈 霓虹</button>
+                    <button class="theme-btn" data-theme="custom">🎨 自定义</button>
+                </div>
+            </div>
+
+            <div class="control-group" id="customColorGroup" style="display:none;">
+                <h2>自定义颜色</h2>
                 <input type="color" id="particleColor" value="#00ffff">
+            </div>
+
+            <div class="control-group">
+                <h2>连线距离</h2>
+                <input type="range" id="linkDistance" min="0" max="300" value="0" step="10">
+                <span class="value-display" id="linkValue">0</span>
+            </div>
+
+            <div class="control-group">
+                <h2>淡出效果</h2>
+                <input type="range" id="fadeOut" min="0.01" max="0.3" value="0.15" step="0.01">
+                <span class="value-display" id="fadeValue">0.15</span>
             </div>
 
             <div class="control-group">
@@ -130,6 +152,27 @@
             <div id="panel-waterflow" class="control-group mode-specific-panel" style="display:none;">
                 <h2>💧 水流模式</h2>
                 <p class="mode-desc">模拟水流动画的下落粒子效果，可使用通用参数调节。</p>
+            </div>
+
+            <div class="control-group preset-section">
+                <h2>🎯 参数预设</h2>
+                <div class="preset-buttons">
+                    <button id="savePresetBtn" class="preset-save-btn">💾 保存当前预设</button>
+                    <button id="randomPresetBtn" class="preset-random-btn">🎲 随机</button>
+                </div>
+                
+                <div id="savePresetInput" class="save-preset-input" style="display:none;">
+                    <input type="text" id="presetNameInput" placeholder="输入预设名称..." maxlength="30">
+                    <div class="preset-input-buttons">
+                        <button id="confirmSaveBtn" class="preset-confirm-btn">确定</button>
+                        <button id="cancelSaveBtn" class="preset-cancel-btn">取消</button>
+                    </div>
+                </div>
+
+                <div class="preset-list-container">
+                    <h3>已保存预设</h3>
+                    <div id="presetList" class="preset-list"></div>
+                </div>
             </div>
 
             <div class="control-group">

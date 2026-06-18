@@ -280,6 +280,18 @@ class ParticleSystem {
         this.flowForce = 0.25;
         this.flowSpeed = 0.7;
 
+        this.colorTheme = 'cool';
+        this.linkDistance = 0;
+        this.fadeOut = 0.15;
+
+        this.themeColors = {
+            cool: ['#00ffff', '#00aaff', '#0066ff', '#66ccff', '#3399ff', '#00ccff'],
+            warm: ['#ff6b6b', '#ffa502', '#ff7f50', '#ff4757', '#ff6348', '#ff3838'],
+            neon: ['#ff00ff', '#00ffff', '#ffff00', '#ff0080', '#80ff00', '#00ff80']
+        };
+
+        this.currentPresetName = null;
+
         this.resize();
         this.initParticles();
         this.bindEvents();
@@ -503,20 +515,26 @@ class ParticleSystem {
     }
 
     getRandomColorVariant() {
-        const baseColor = this.particleColor;
-        if (this.mode === 'starfield') {
-            const colors = [
-                '#ffffff', '#ffffaa', '#aaaaff', '#ffaaaa',
-                '#aaffaa', baseColor
-            ];
-            return colors[Math.floor(Math.random() * colors.length)];
+        if (this.colorTheme === 'custom') {
+            const baseColor = this.particleColor;
+            if (this.mode === 'starfield') {
+                const colors = [
+                    '#ffffff', '#ffffaa', '#aaaaff', '#ffaaaa',
+                    '#aaffaa', baseColor
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            return baseColor;
         }
-        return baseColor;
+        return this.getThemeColor();
     }
 
     getBlueShade() {
-        const shades = ['#00ffff', '#00aaff', '#0066ff', '#66ccff', '#3399ff'];
-        return shades[Math.floor(Math.random() * shades.length)];
+        if (this.colorTheme === 'custom') {
+            const shades = ['#00ffff', '#00aaff', '#0066ff', '#66ccff', '#3399ff'];
+            return shades[Math.floor(Math.random() * shades.length)];
+        }
+        return this.getThemeColor();
     }
 
     hslToHex(h, s, l) {
@@ -706,7 +724,7 @@ class ParticleSystem {
     }
 
     draw() {
-        const trailAlpha = this.mode === 'flowfield' ? 0.08 : this.mode === 'wave' ? 0.12 : 0.15;
+        const trailAlpha = this.fadeOut;
         this.ctx.fillStyle = `rgba(5, 5, 10, ${trailAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -714,10 +732,37 @@ class ParticleSystem {
             this.drawFractalLines();
         }
 
+        if (this.linkDistance > 0 && this.mode !== 'fractal' && this.mode !== 'wave') {
+            this.drawLinks();
+        }
+
         for (const particle of this.particles) {
             particle.size = this.particleSize;
             particle.glow = this.glowIntensity;
             particle.draw(this.ctx);
+        }
+    }
+
+    drawLinks() {
+        const maxDist = this.linkDistance;
+        for (let i = 0; i < this.particles.length; i++) {
+            for (let j = i + 1; j < this.particles.length; j++) {
+                const p1 = this.particles[i];
+                const p2 = this.particles[j];
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < maxDist) {
+                    const alpha = (1 - dist / maxDist) * 0.3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(p1.x, p1.y);
+                    this.ctx.lineTo(p2.x, p2.y);
+                    this.ctx.strokeStyle = `rgba(0, 255, 255, ${alpha})`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+            }
         }
     }
 
@@ -872,6 +917,118 @@ class ParticleSystem {
         this.flowSpeed = val;
     }
 
+    setColorTheme(theme) {
+        this.colorTheme = theme;
+        if (theme === 'custom') return;
+        
+        const colors = this.themeColors[theme];
+        if (colors) {
+            for (const p of this.particles) {
+                p.color = colors[Math.floor(Math.random() * colors.length)];
+            }
+        }
+    }
+
+    setLinkDistance(val) {
+        this.linkDistance = val;
+    }
+
+    setFadeOut(val) {
+        this.fadeOut = val;
+    }
+
+    getThemeColor() {
+        if (this.colorTheme === 'custom') {
+            return this.particleColor;
+        }
+        const colors = this.themeColors[this.colorTheme];
+        return colors ? colors[Math.floor(Math.random() * colors.length)] : this.particleColor;
+    }
+
+    getCurrentPreset() {
+        return {
+            mode: this.mode,
+            colorTheme: this.colorTheme,
+            particleColor: this.particleColor,
+            particleCount: this.particleCount,
+            particleSpeed: this.particleSpeed,
+            particleSize: this.particleSize,
+            glowIntensity: this.glowIntensity,
+            interaction: this.interaction,
+            linkDistance: this.linkDistance,
+            fadeOut: this.fadeOut,
+            waveFrequency: this.waveFrequency,
+            waveAmplitude: this.waveAmplitude,
+            waveLayers: this.waveLayers,
+            fractalDepth: this.fractalDepth,
+            fractalBranchAngle: this.fractalBranchAngle,
+            fractalLengthRatio: this.fractalLengthRatio,
+            flowScale: this.flowScale,
+            flowForce: this.flowForce,
+            flowSpeed: this.flowSpeed
+        };
+    }
+
+    loadPreset(preset) {
+        this.mode = preset.mode;
+        this.colorTheme = preset.colorTheme;
+        this.particleColor = preset.particleColor || '#00ffff';
+        this.particleCount = preset.particleCount;
+        this.particleSpeed = preset.particleSpeed;
+        this.particleSize = preset.particleSize;
+        this.glowIntensity = preset.glowIntensity;
+        this.interaction = preset.interaction;
+        this.linkDistance = preset.linkDistance;
+        this.fadeOut = preset.fadeOut;
+        this.waveFrequency = preset.waveFrequency;
+        this.waveAmplitude = preset.waveAmplitude;
+        this.waveLayers = preset.waveLayers;
+        this.fractalDepth = preset.fractalDepth;
+        this.fractalBranchAngle = preset.fractalBranchAngle;
+        this.fractalLengthRatio = preset.fractalLengthRatio;
+        this.flowScale = preset.flowScale;
+        this.flowForce = preset.flowForce;
+        this.flowSpeed = preset.flowSpeed;
+        this.initParticles();
+    }
+
+    randomizeCurrentMode() {
+        const randomInRange = (min, max, step = 1) => {
+            const range = (max - min) / step;
+            return min + Math.floor(Math.random() * range) * step;
+        };
+
+        this.particleCount = randomInRange(50, 500, 10);
+        this.particleSpeed = parseFloat(randomInRange(0.1, 5, 0.1).toFixed(1));
+        this.particleSize = parseFloat(randomInRange(1, 10, 0.5).toFixed(1));
+        this.glowIntensity = randomInRange(0, 30, 1);
+        this.linkDistance = randomInRange(0, 300, 10);
+        this.fadeOut = parseFloat(randomInRange(0.01, 0.3, 0.01).toFixed(2));
+
+        const themes = ['cool', 'warm', 'neon'];
+        this.colorTheme = themes[Math.floor(Math.random() * themes.length)];
+
+        switch (this.mode) {
+            case 'wave':
+                this.waveFrequency = parseFloat(randomInRange(0.001, 0.03, 0.0005).toFixed(4));
+                this.waveAmplitude = randomInRange(10, 150, 5);
+                this.waveLayers = randomInRange(1, 8, 1);
+                break;
+            case 'fractal':
+                this.fractalDepth = randomInRange(3, 12, 1);
+                this.fractalBranchAngle = parseFloat(randomInRange(0.1, 1.2, 0.05).toFixed(2));
+                this.fractalLengthRatio = parseFloat(randomInRange(0.4, 0.85, 0.01).toFixed(2));
+                break;
+            case 'flowfield':
+                this.flowScale = parseFloat(randomInRange(0.001, 0.015, 0.0005).toFixed(4));
+                this.flowForce = parseFloat(randomInRange(0.05, 1.0, 0.05).toFixed(2));
+                this.flowSpeed = parseFloat(randomInRange(0.1, 2.0, 0.1).toFixed(2));
+                break;
+        }
+
+        this.initParticles();
+    }
+
     takeScreenshot() {
         const dataURL = this.canvas.toDataURL('image/png');
         const link = document.createElement('a');
@@ -887,6 +1044,9 @@ class ParticleSystem {
         this.particleSize = 3;
         this.glowIntensity = 15;
         this.interaction = 'attract';
+        this.colorTheme = 'cool';
+        this.linkDistance = 0;
+        this.fadeOut = 0.15;
         this.waveFrequency = 0.008;
         this.waveAmplitude = 60;
         this.waveLayers = 4;
@@ -896,6 +1056,7 @@ class ParticleSystem {
         this.flowScale = 0.004;
         this.flowForce = 0.25;
         this.flowSpeed = 0.7;
+        this.currentPresetName = null;
         this.initParticles();
     }
 }
@@ -913,156 +1074,420 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const countSlider = document.getElementById('particleCount');
     const countValue = document.getElementById('countValue');
+    const colorPicker = document.getElementById('particleColor');
+    const speedSlider = document.getElementById('particleSpeed');
+    const speedValue = document.getElementById('speedValue');
+    const sizeSlider = document.getElementById('particleSize');
+    const sizeValue = document.getElementById('sizeValue');
+    const glowSlider = document.getElementById('glowIntensity');
+    const glowValue = document.getElementById('glowValue');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    const interactionButtons = document.querySelectorAll('.interaction-btn');
+    const themeButtons = document.querySelectorAll('.theme-btn');
+    const customColorGroup = document.getElementById('customColorGroup');
+    const linkSlider = document.getElementById('linkDistance');
+    const linkValue = document.getElementById('linkValue');
+    const fadeSlider = document.getElementById('fadeOut');
+    const fadeValue = document.getElementById('fadeValue');
+    const waveFreqSlider = document.getElementById('waveFrequency');
+    const waveFreqValue = document.getElementById('waveFreqValue');
+    const waveAmpSlider = document.getElementById('waveAmplitude');
+    const waveAmpValue = document.getElementById('waveAmpValue');
+    const waveLayersSlider = document.getElementById('waveLayers');
+    const waveLayersValue = document.getElementById('waveLayersValue');
+    const fractalDepthSlider = document.getElementById('fractalDepth');
+    const fractalDepthValue = document.getElementById('fractalDepthValue');
+    const fractalAngleSlider = document.getElementById('fractalBranchAngle');
+    const fractalAngleValue = document.getElementById('fractalAngleValue');
+    const fractalRatioSlider = document.getElementById('fractalLengthRatio');
+    const fractalRatioValue = document.getElementById('fractalRatioValue');
+    const flowScaleSlider = document.getElementById('flowScale');
+    const flowScaleValue = document.getElementById('flowScaleValue');
+    const flowForceSlider = document.getElementById('flowForce');
+    const flowForceValue = document.getElementById('flowForceValue');
+    const flowSpeedSlider = document.getElementById('flowSpeed');
+    const flowSpeedValue = document.getElementById('flowSpeedValue');
+    const screenshotBtn = document.getElementById('screenshotBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const STORAGE_KEY = 'particle-art-presets';
+
+    const defaultPresets = [
+        {
+            name: '🌌 星空',
+            preset: {
+                mode: 'starfield',
+                colorTheme: 'cool',
+                particleColor: '#00ffff',
+                particleCount: 500,
+                particleSpeed: 0.3,
+                particleSize: 2,
+                glowIntensity: 15,
+                interaction: 'attract',
+                linkDistance: 150,
+                fadeOut: 0.15,
+                waveFrequency: 0.008,
+                waveAmplitude: 60,
+                waveLayers: 4,
+                fractalDepth: 8,
+                fractalBranchAngle: 0.5,
+                fractalLengthRatio: 0.67,
+                flowScale: 0.004,
+                flowForce: 0.25,
+                flowSpeed: 0.7
+            }
+        },
+        {
+            name: '🌊 海洋',
+            preset: {
+                mode: 'wave',
+                colorTheme: 'warm',
+                particleColor: '#00ffff',
+                particleCount: 200,
+                particleSpeed: 1,
+                particleSize: 3,
+                glowIntensity: 15,
+                interaction: 'attract',
+                linkDistance: 0,
+                fadeOut: 0.12,
+                waveFrequency: 0.015,
+                waveAmplitude: 80,
+                waveLayers: 8,
+                fractalDepth: 8,
+                fractalBranchAngle: 0.5,
+                fractalLengthRatio: 0.67,
+                flowScale: 0.004,
+                flowForce: 0.25,
+                flowSpeed: 0.7
+            }
+        },
+        {
+            name: '🌀 漩涡',
+            preset: {
+                mode: 'flowfield',
+                colorTheme: 'neon',
+                particleColor: '#00ffff',
+                particleCount: 500,
+                particleSpeed: 2,
+                particleSize: 2,
+                glowIntensity: 20,
+                interaction: 'attract',
+                linkDistance: 0,
+                fadeOut: 0.03,
+                waveFrequency: 0.008,
+                waveAmplitude: 60,
+                waveLayers: 4,
+                fractalDepth: 8,
+                fractalBranchAngle: 0.5,
+                fractalLengthRatio: 0.67,
+                flowScale: 0.003,
+                flowForce: 0.25,
+                flowSpeed: 2
+            }
+        }
+    ];
+
+    const initDefaultPresets = () => {
+        const existing = localStorage.getItem(STORAGE_KEY);
+        if (!existing) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultPresets));
+        } else {
+            const presets = JSON.parse(existing);
+            const hasDefaults = defaultPresets.every(dp => 
+                presets.some(p => p.name === dp.name)
+            );
+            if (!hasDefaults) {
+                defaultPresets.forEach(dp => {
+                    if (!presets.some(p => p.name === dp.name)) {
+                        presets.push(dp);
+                    }
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+            }
+        }
+    };
+
+    const getPresets = () => {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    };
+
+    const savePreset = (name, preset) => {
+        const presets = getPresets();
+        const existingIndex = presets.findIndex(p => p.name === name);
+        if (existingIndex >= 0) {
+            presets[existingIndex] = { name, preset };
+        } else {
+            presets.push({ name, preset });
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+    };
+
+    const deletePreset = (name) => {
+        const presets = getPresets().filter(p => p.name !== name);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+        if (system.currentPresetName === name) {
+            system.currentPresetName = null;
+        }
+    };
+
+    const updateSlidersFromSystem = () => {
+        countSlider.value = system.particleCount;
+        countValue.textContent = system.particleCount;
+        speedSlider.value = system.particleSpeed;
+        speedValue.textContent = system.particleSpeed.toFixed(1);
+        sizeSlider.value = system.particleSize;
+        sizeValue.textContent = system.particleSize.toFixed(1);
+        glowSlider.value = system.glowIntensity;
+        glowValue.textContent = system.glowIntensity;
+        colorPicker.value = system.particleColor;
+        linkSlider.value = system.linkDistance;
+        linkValue.textContent = system.linkDistance;
+        fadeSlider.value = system.fadeOut;
+        fadeValue.textContent = system.fadeOut.toFixed(2);
+
+        themeButtons.forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-theme="${system.colorTheme}"]`).classList.add('active');
+        customColorGroup.style.display = system.colorTheme === 'custom' ? 'block' : 'none';
+
+        interactionButtons.forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-interaction="${system.interaction}"]`).classList.add('active');
+
+        modeButtons.forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-mode="${system.mode}"]`).classList.add('active');
+        showModePanel(system.mode);
+
+        if (waveFreqSlider) { waveFreqSlider.value = system.waveFrequency; waveFreqValue.textContent = system.waveFrequency.toFixed(4); }
+        if (waveAmpSlider) { waveAmpSlider.value = system.waveAmplitude; waveAmpValue.textContent = system.waveAmplitude; }
+        if (waveLayersSlider) { waveLayersSlider.value = system.waveLayers; waveLayersValue.textContent = system.waveLayers; }
+        if (fractalDepthSlider) { fractalDepthSlider.value = system.fractalDepth; fractalDepthValue.textContent = system.fractalDepth; }
+        if (fractalAngleSlider) { fractalAngleSlider.value = system.fractalBranchAngle; fractalAngleValue.textContent = system.fractalBranchAngle.toFixed(2); }
+        if (fractalRatioSlider) { fractalRatioSlider.value = system.fractalLengthRatio; fractalRatioValue.textContent = system.fractalLengthRatio.toFixed(2); }
+        if (flowScaleSlider) { flowScaleSlider.value = system.flowScale; flowScaleValue.textContent = system.flowScale.toFixed(4); }
+        if (flowForceSlider) { flowForceSlider.value = system.flowForce; flowForceValue.textContent = system.flowForce.toFixed(2); }
+        if (flowSpeedSlider) { flowSpeedSlider.value = system.flowSpeed; flowSpeedValue.textContent = system.flowSpeed.toFixed(2); }
+    };
+
+    const loadPresetByName = (name) => {
+        const presets = getPresets();
+        const found = presets.find(p => p.name === name);
+        if (found) {
+            system.loadPreset(found.preset);
+            system.currentPresetName = name;
+            updateSlidersFromSystem();
+            renderPresetList();
+        }
+    };
+
+    const renderPresetList = () => {
+        const presetList = document.getElementById('presetList');
+        const presets = getPresets();
+        
+        if (presets.length === 0) {
+            presetList.innerHTML = '<div class="empty-preset">暂无保存的预设</div>';
+            return;
+        }
+
+        presetList.innerHTML = presets.map(p => `
+            <div class="preset-item ${system.currentPresetName === p.name ? 'active' : ''}" data-name="${p.name}">
+                <span class="preset-name">${p.name}</span>
+                <button class="preset-delete-btn" data-delete="${p.name}" title="删除预设">×</button>
+            </div>
+        `).join('');
+
+        presetList.querySelectorAll('.preset-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('preset-delete-btn')) {
+                    loadPresetByName(item.dataset.name);
+                }
+            });
+        });
+
+        presetList.querySelectorAll('.preset-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const name = btn.dataset.delete;
+                if (confirm(`确定要删除预设 "${name}" 吗？`)) {
+                    deletePreset(name);
+                    renderPresetList();
+                }
+            });
+        });
+    };
+
+    const markAsModified = () => {
+        system.currentPresetName = null;
+        renderPresetList();
+    };
+
     countSlider.addEventListener('input', (e) => {
         const value = parseInt(e.target.value);
         countValue.textContent = value;
         system.setParticleCount(value);
+        markAsModified();
     });
 
-    const colorPicker = document.getElementById('particleColor');
     colorPicker.addEventListener('input', (e) => {
         system.setColor(e.target.value);
+        markAsModified();
     });
 
-    const speedSlider = document.getElementById('particleSpeed');
-    const speedValue = document.getElementById('speedValue');
     speedSlider.addEventListener('input', (e) => {
         const value = parseFloat(e.target.value);
         speedValue.textContent = value.toFixed(1);
         system.setSpeed(value);
+        markAsModified();
     });
 
-    const sizeSlider = document.getElementById('particleSize');
-    const sizeValue = document.getElementById('sizeValue');
     sizeSlider.addEventListener('input', (e) => {
         const value = parseFloat(e.target.value);
         sizeValue.textContent = value.toFixed(1);
         system.setSize(value);
+        markAsModified();
     });
 
-    const glowSlider = document.getElementById('glowIntensity');
-    const glowValue = document.getElementById('glowValue');
     glowSlider.addEventListener('input', (e) => {
         const value = parseInt(e.target.value);
         glowValue.textContent = value;
         system.setGlow(value);
+        markAsModified();
     });
 
-    const modeButtons = document.querySelectorAll('.mode-btn');
     modeButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             modeButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             system.setMode(btn.dataset.mode);
             showModePanel(btn.dataset.mode);
+            markAsModified();
         });
     });
 
-    const interactionButtons = document.querySelectorAll('.interaction-btn');
     interactionButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             interactionButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             system.setInteraction(btn.dataset.interaction);
+            markAsModified();
         });
     });
 
-    const waveFreqSlider = document.getElementById('waveFrequency');
-    const waveFreqValue = document.getElementById('waveFreqValue');
+    themeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            themeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const theme = btn.dataset.theme;
+            system.setColorTheme(theme);
+            
+            if (theme === 'custom') {
+                customColorGroup.style.display = 'block';
+            } else {
+                customColorGroup.style.display = 'none';
+            }
+            
+            markAsModified();
+        });
+    });
+
+    linkSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        linkValue.textContent = value;
+        system.setLinkDistance(value);
+        markAsModified();
+    });
+
+    fadeSlider.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        fadeValue.textContent = value.toFixed(2);
+        system.setFadeOut(value);
+        markAsModified();
+    });
+
     if (waveFreqSlider) {
         waveFreqSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             waveFreqValue.textContent = value.toFixed(4);
             system.setWaveFrequency(value);
+            markAsModified();
         });
     }
 
-    const waveAmpSlider = document.getElementById('waveAmplitude');
-    const waveAmpValue = document.getElementById('waveAmpValue');
     if (waveAmpSlider) {
         waveAmpSlider.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
             waveAmpValue.textContent = value;
             system.setWaveAmplitude(value);
+            markAsModified();
         });
     }
 
-    const waveLayersSlider = document.getElementById('waveLayers');
-    const waveLayersValue = document.getElementById('waveLayersValue');
     if (waveLayersSlider) {
         waveLayersSlider.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
             waveLayersValue.textContent = value;
             system.setWaveLayers(value);
+            markAsModified();
         });
     }
 
-    const fractalDepthSlider = document.getElementById('fractalDepth');
-    const fractalDepthValue = document.getElementById('fractalDepthValue');
     if (fractalDepthSlider) {
         fractalDepthSlider.addEventListener('input', (e) => {
             const value = parseInt(e.target.value);
             fractalDepthValue.textContent = value;
             system.setFractalDepth(value);
+            markAsModified();
         });
     }
 
-    const fractalAngleSlider = document.getElementById('fractalBranchAngle');
-    const fractalAngleValue = document.getElementById('fractalAngleValue');
     if (fractalAngleSlider) {
         fractalAngleSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             fractalAngleValue.textContent = value.toFixed(2);
             system.setFractalBranchAngle(value);
+            markAsModified();
         });
     }
 
-    const fractalRatioSlider = document.getElementById('fractalLengthRatio');
-    const fractalRatioValue = document.getElementById('fractalRatioValue');
     if (fractalRatioSlider) {
         fractalRatioSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             fractalRatioValue.textContent = value.toFixed(2);
             system.setFractalLengthRatio(value);
+            markAsModified();
         });
     }
 
-    const flowScaleSlider = document.getElementById('flowScale');
-    const flowScaleValue = document.getElementById('flowScaleValue');
     if (flowScaleSlider) {
         flowScaleSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             flowScaleValue.textContent = value.toFixed(4);
             system.setFlowScale(value);
+            markAsModified();
         });
     }
 
-    const flowForceSlider = document.getElementById('flowForce');
-    const flowForceValue = document.getElementById('flowForceValue');
     if (flowForceSlider) {
         flowForceSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             flowForceValue.textContent = value.toFixed(2);
             system.setFlowForce(value);
+            markAsModified();
         });
     }
 
-    const flowSpeedSlider = document.getElementById('flowSpeed');
-    const flowSpeedValue = document.getElementById('flowSpeedValue');
     if (flowSpeedSlider) {
         flowSpeedSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             flowSpeedValue.textContent = value.toFixed(2);
             system.setFlowSpeed(value);
+            markAsModified();
         });
     }
 
-    const screenshotBtn = document.getElementById('screenshotBtn');
     screenshotBtn.addEventListener('click', () => {
         system.takeScreenshot();
     });
 
-    const resetBtn = document.getElementById('resetBtn');
     resetBtn.addEventListener('click', () => {
         countSlider.value = 200;
         countValue.textContent = '200';
@@ -1090,7 +1515,72 @@ document.addEventListener('DOMContentLoaded', () => {
         if (flowScaleSlider) { flowScaleSlider.value = 0.004; flowScaleValue.textContent = '0.0040'; }
         if (flowForceSlider) { flowForceSlider.value = 0.25; flowForceValue.textContent = '0.25'; }
         if (flowSpeedSlider) { flowSpeedSlider.value = 0.7; flowSpeedValue.textContent = '0.70'; }
-        
+
+        themeButtons.forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-theme="cool"]').classList.add('active');
+        customColorGroup.style.display = 'none';
+
+        linkSlider.value = 0;
+        linkValue.textContent = '0';
+
+        fadeSlider.value = 0.15;
+        fadeValue.textContent = '0.15';
+
         system.reset();
+        renderPresetList();
     });
+
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    const savePresetInput = document.getElementById('savePresetInput');
+    const presetNameInput = document.getElementById('presetNameInput');
+    const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+    const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+    const randomPresetBtn = document.getElementById('randomPresetBtn');
+
+    savePresetBtn.addEventListener('click', () => {
+        savePresetInput.style.display = 'block';
+        presetNameInput.value = '';
+        presetNameInput.focus();
+    });
+
+    cancelSaveBtn.addEventListener('click', () => {
+        savePresetInput.style.display = 'none';
+        presetNameInput.value = '';
+    });
+
+    confirmSaveBtn.addEventListener('click', () => {
+        const name = presetNameInput.value.trim();
+        if (!name) {
+            alert('请输入预设名称');
+            presetNameInput.focus();
+            return;
+        }
+        
+        const presets = getPresets();
+        const existing = presets.find(p => p.name === name);
+        if (existing && !confirm(`预设 "${name}" 已存在，是否覆盖？`)) {
+            return;
+        }
+
+        savePreset(name, system.getCurrentPreset());
+        system.currentPresetName = name;
+        savePresetInput.style.display = 'none';
+        presetNameInput.value = '';
+        renderPresetList();
+    });
+
+    presetNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            confirmSaveBtn.click();
+        }
+    });
+
+    randomPresetBtn.addEventListener('click', () => {
+        system.randomizeCurrentMode();
+        updateSlidersFromSystem();
+        renderPresetList();
+    });
+
+    initDefaultPresets();
+    renderPresetList();
 });
