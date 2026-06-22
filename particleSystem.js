@@ -939,6 +939,8 @@ class ParticleSystem {
         const height = Math.floor(rect.height);
         const encoder = new GIFEncoder(width, height);
         encoder.setDelay(frameInterval);
+        encoder.setDithering(true);
+        encoder.setDispose(2);
 
         const offscreenCanvas = document.createElement('canvas');
         offscreenCanvas.width = width;
