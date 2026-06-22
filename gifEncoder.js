@@ -186,10 +186,8 @@ class GIFEncoder {
         let accBits = 0;
 
         const writeCode = (code, size) => {
-            while (size > 0) {
-                accum |= (code & 1) << accBits;
-                code >>= 1;
-                size--;
+            for (let i = size - 1; i >= 0; i--) {
+                accum |= ((code >> i) & 1) << accBits;
                 accBits++;
                 if (accBits === 8) {
                     blocks.push(accum & 0xff);

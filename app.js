@@ -426,7 +426,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const recordGifBtn = document.getElementById('recordGifBtn');
+    const gifProgressOverlay = document.getElementById('gifProgressOverlay');
+    const gifProgressCurrent = document.getElementById('gifProgressCurrent');
+    const gifProgressTotal = document.getElementById('gifProgressTotal');
+    const gifProgressBar = document.getElementById('gifProgressBar');
+    const gifProgressPercent = document.getElementById('gifProgressPercent');
     let isRecording = false;
+
+    const showGifProgress = (current, total) => {
+        gifProgressCurrent.textContent = current;
+        gifProgressTotal.textContent = total;
+        const percent = Math.round((current / total) * 100);
+        gifProgressBar.style.width = percent + '%';
+        gifProgressPercent.textContent = percent + '%';
+    };
+
+    const showGifOverlay = () => {
+        gifProgressOverlay.classList.add('show');
+    };
+
+    const hideGifOverlay = () => {
+        gifProgressOverlay.classList.remove('show');
+    };
 
     recordGifBtn.addEventListener('click', async () => {
         if (isRecording) return;
@@ -436,13 +457,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalText = recordGifBtn.textContent;
 
         try {
+            showGifOverlay();
             await system.recordGif(3000, 100, (current, total) => {
                 recordGifBtn.textContent = `🎬 录制中 ${current}/${total}`;
+                showGifProgress(current, total);
             });
         } catch (e) {
             console.error('GIF录制失败:', e);
             alert('GIF录制失败: ' + e.message);
         } finally {
+            hideGifOverlay();
             isRecording = false;
             recordGifBtn.disabled = false;
             recordGifBtn.classList.remove('recording');
