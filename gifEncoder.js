@@ -5,10 +5,27 @@ class GIFEncoder {
         this.delay = 10;
         this.repeat = 0;
         this.frames = [];
+        this.transparent = null;
+        this.transparentIndex = 0;
+        this.dispose = -1;
+        this.firstFrame = true;
+        this.sample = 10;
     }
 
     setDelay(ms) {
         this.delay = Math.round(ms / 10);
+    }
+
+    setFrameRate(fps) {
+        this.delay = Math.round(100 / fps);
+    }
+
+    setDispose(code) {
+        if (code >= 0) this.dispose = code;
+    }
+
+    setTransparent(color) {
+        this.transparent = color;
     }
 
     addFrame(imageData) {
@@ -23,78 +40,267 @@ class GIFEncoder {
         }
 
         const palette = this._buildGlobalPalette(allPixels);
+        this._colorTab = palette;
         const colorMap = this._buildColorMap(palette);
 
-        const stream = [];
-        const writeByte = (b) => stream.push(b & 0xff);
-        const writeShort = (s) => { writeByte(s & 0xff); writeByte((s >> 8) & 0xff); };
-        const writeString = (s) => { for (let i = 0; i < s.length; i++) writeByte(s.charCodeAt(i)); };
+        this._out = [];
+        this._writeString('GIF89a');
 
-        writeString('GIF89a');
-        writeShort(this.width);
-        writeShort(this.height);
-        writeByte(0xf7);
-        writeByte(0);
-        writeByte(0);
+        this._writeShort(this.width);
+        this._writeShort(this.height);
+        this._writeByte(0xf7);
+        this._writeByte(0);
+        this._writeByte(0);
 
-        for (let i = 0; i < 768; i++) writeByte(palette[i]);
+        for (let i = 0; i < 768; i++) {
+            this._writeByte(palette[i]);
+        }
 
-        writeByte(0x21);
-        writeByte(0xff);
-        writeByte(11);
-        const netscape = [78, 69, 84, 83, 67, 65, 80, 69, 50, 46, 48];
-        for (const c of netscape) writeByte(c);
-        writeByte(3);
-        writeByte(1);
-        writeShort(this.repeat);
-        writeByte(0);
+        if (this.transparent !== null) {
+            this.transparentIndex = this._findClosest(this.transparent);
+        }
+
+        this._writeNetscapeExt();
 
         for (let f = 0; f < this.frames.length; f++) {
             const framePixels = this.frames[f];
             const indexedPixels = new Uint8Array(pixelCount);
             for (let i = 0; i < pixelCount; i++) {
                 const idx = i * 4;
-                const r = framePixels[idx] >> 3;
-                const g = framePixels[idx + 1] >> 3;
-                const b = framePixels[idx + 2] >> 3;
-                const mapIdx = (r << 10) | (g << 5) | b;
-                indexedPixels[i] = colorMap[mapIdx];
+                const r = framePixels[idx];
+                const g = framePixels[idx + 1];
+                const b = framePixels[idx + 2];
+                const pixel = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+                indexedPixels[i] = colorMap[pixel];
             }
-
-            writeByte(0x21);
-            writeByte(0xf9);
-            writeByte(4);
-            writeByte(0);
-            writeShort(this.delay);
-            writeByte(0);
-            writeByte(0);
-
-            writeByte(0x2c);
-            writeShort(0);
-            writeShort(0);
-            writeShort(this.width);
-            writeShort(this.height);
-            writeByte(0);
-
-            this._lzwEncode(indexedPixels, writeByte);
+            this._writeGraphicCtrlExt();
+            this._writeImageDesc();
+            this._writeLSD();
+            this._writePixels(indexedPixels);
         }
 
-        writeByte(0x3b);
-        this.stream = stream;
+        this._writeByte(0x3b);
     }
 
     getBlob() {
-        if (!this.stream) this.finish();
-        return new Blob([new Uint8Array(this.stream)], { type: 'image/gif' });
+        if (!this._out) this.finish();
+        return new Blob([new Uint8Array(this._out)], { type: 'image/gif' });
     }
 
     getDataURL() {
-        if (!this.stream) this.finish();
+        if (!this._out) this.finish();
         let binary = '';
-        for (let i = 0; i < this.stream.length; i++) {
-            binary += String.fromCharCode(this.stream[i]);
+        for (let i = 0; i < this._out.length; i++) {
+            binary += String.fromCharCode(this._out[i]);
         }
         return 'data:image/gif;base64,' + btoa(binary);
+    }
+
+    _writeByte(b) {
+        this._out.push(b & 0xff);
+    }
+
+    _writeShort(s) {
+        this._writeByte(s & 0xff);
+        this._writeByte((s >> 8) & 0xff);
+    }
+
+    _writeString(s) {
+        for (let i = 0; i < s.length; i++) {
+            this._writeByte(s.charCodeAt(i));
+        }
+    }
+
+    _writeLSD() {
+        this._writeByte(8);
+    }
+
+    _writePalette() {
+        for (let i = 0; i < this._colorTab.length; i++) {
+            this._writeByte(this._colorTab[i]);
+        }
+        const n = (3 * 256) - this._colorTab.length;
+        for (let i = 0; i < n; i++) {
+            this._writeByte(0);
+        }
+    }
+
+    _writeNetscapeExt() {
+        this._writeByte(0x21);
+        this._writeByte(0xff);
+        this._writeByte(11);
+        const netscape = [78, 69, 84, 83, 67, 65, 80, 69, 50, 46, 48];
+        for (const c of netscape) {
+            this._writeByte(c);
+        }
+        this._writeByte(3);
+        this._writeByte(1);
+        this._writeShort(this.repeat);
+        this._writeByte(0);
+    }
+
+    _writeGraphicCtrlExt() {
+        this._writeByte(0x21);
+        this._writeByte(0xf9);
+        this._writeByte(4);
+        let transp, disp;
+        if (this.transparent === null) {
+            transp = 0;
+            disp = 0;
+        } else {
+            transp = 1;
+            disp = 2;
+        }
+        if (this.dispose >= 0) {
+            disp = this.dispose & 7;
+        }
+        disp <<= 2;
+        this._writeByte(0 | disp | 0 | transp);
+        this._writeShort(this.delay);
+        this._writeByte(this.transparentIndex);
+        this._writeByte(0);
+    }
+
+    _writeImageDesc() {
+        this._writeByte(0x2c);
+        this._writeShort(0);
+        this._writeShort(0);
+        this._writeShort(this.width);
+        this._writeShort(this.height);
+        if (this.firstFrame) {
+            this.firstFrame = false;
+            this._writeByte(0);
+        } else {
+            this._writeByte(0);
+        }
+    }
+
+    _writePixels(indexedPixels) {
+        const minCodeSize = 8;
+        const clearCode = 1 << minCodeSize;
+        const eofCode = clearCode + 1;
+
+        const bitAccum = new BitAccum();
+
+        const BITS = 12;
+        const HSIZE = 5003;
+        const htab = new Int32Array(HSIZE);
+        const codtab = new Int32Array(HSIZE);
+        const masks = [
+            0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F,
+            0x003F, 0x007F, 0x00FF, 0x01FF, 0x03FF, 0x07FF,
+            0x0FFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF
+        ];
+
+        let freeEntry;
+        let clearFlag;
+        let nBits;
+        let maxcode;
+        let hcode;
+        let ent;
+        let hsizeReg;
+        let disp;
+
+        const pixelCount = indexedPixels.length;
+        let curPixel = 0;
+        let remaining = pixelCount;
+
+        const output = [];
+        bitAccum.reset(output);
+
+        hsizeReg = HSIZE;
+        for (let i = 0; i < hsizeReg; i++) {
+            htab[i] = -1;
+        }
+
+        nBits = minCodeSize + 1;
+        maxcode = (1 << nBits) - 1;
+        clearFlag = true;
+        freeEntry = clearCode + 2;
+
+        bitAccum.setCodeSize(minCodeSize);
+        bitAccum.write(clearCode, nBits);
+
+        if (remaining === 0) {
+            bitAccum.write(eofCode, nBits);
+            bitAccum.flush();
+            for (let i = 0; i < output.length; i++) {
+                this._writeByte(output[i]);
+            }
+            return;
+        }
+
+        ent = indexedPixels[curPixel++];
+        remaining--;
+
+        while (remaining > 0) {
+            const c = indexedPixels[curPixel++];
+            remaining--;
+
+            hcode = (c << BITS) + ent;
+            let h = (c << 4) ^ ent;
+
+            if (htab[h] === hcode) {
+                ent = codtab[h];
+                continue;
+            }
+
+            disp = h === 0 ? 1 : hsizeReg - h;
+
+            let probe = true;
+            while (probe) {
+                h -= disp;
+                if (h < 0) h += hsizeReg;
+                if (htab[h] === hcode) {
+                    ent = codtab[h];
+                    probe = false;
+                    break;
+                }
+                if (htab[h] < 0) {
+                    probe = false;
+                    break;
+                }
+            }
+
+            if (!probe && htab[h] === hcode) {
+                continue;
+            }
+
+            bitAccum.write(ent, nBits);
+            ent = c;
+            if (freeEntry < (1 << BITS)) {
+                codtab[h] = freeEntry++;
+                htab[h] = hcode;
+                if (freeEntry > maxcode) {
+                    if (nBits < BITS) {
+                        nBits++;
+                        maxcode = (1 << nBits) - 1;
+                    } else {
+                        htab.fill(-1);
+                        freeEntry = clearCode + 2;
+                        clearFlag = true;
+                        bitAccum.write(clearCode, nBits);
+                        nBits = minCodeSize + 1;
+                        maxcode = (1 << nBits) - 1;
+                    }
+                }
+            } else {
+                htab.fill(-1);
+                freeEntry = clearCode + 2;
+                clearFlag = true;
+                bitAccum.write(clearCode, nBits);
+                nBits = minCodeSize + 1;
+                maxcode = (1 << nBits) - 1;
+            }
+        }
+
+        bitAccum.write(ent, nBits);
+        bitAccum.write(eofCode, nBits);
+        bitAccum.flush();
+
+        for (let i = 0; i < output.length; i++) {
+            this._writeByte(output[i]);
+        }
     }
 
     _buildGlobalPalette(allPixels) {
@@ -158,109 +364,80 @@ class GIFEncoder {
         return colorMap;
     }
 
-    _lzwEncode(indexedPixels, writeByte) {
-        const minCodeSize = 8;
-        writeByte(minCodeSize);
+    _findClosest(color) {
+        const r = (color >> 16) & 0xff;
+        const g = (color >> 8) & 0xff;
+        const b = color & 0xff;
+        let minPos = 0;
+        let minDist = 256 * 256 * 256;
+        for (let i = 0; i < 256; i++) {
+            const dr = r - this._colorTab[i * 3];
+            const dg = g - this._colorTab[i * 3 + 1];
+            const db = b - this._colorTab[i * 3 + 2];
+            const d = dr * dr + dg * dg + db * db;
+            if (d < minDist) {
+                minDist = d;
+                minPos = i;
+            }
+        }
+        return minPos;
+    }
+}
 
-        const BITS = 12;
-        const HSIZE = 5003;
-        const clear = 1 << minCodeSize;
-        const eofCode = clear + 1;
-        let freeEntry = clear + 2;
-        let codeSize = minCodeSize + 1;
-        let highBit = 1 << codeSize;
-        let maxCode = highBit - 1;
+class BitAccum {
+    constructor() {
+        this.codeSize = 0;
+        this.accumulator = 0;
+        this.accBits = 0;
+        this.blocks = [];
+        this.blockSize = 0;
+        this.output = null;
+    }
 
-        const hTab = new Int32Array(HSIZE);
-        const codTab = new Int32Array(HSIZE);
-        hTab.fill(-1);
+    reset(output) {
+        this.accumulator = 0;
+        this.accBits = 0;
+        this.blocks = [];
+        this.blockSize = 0;
+        this.output = output;
+    }
 
-        const pixelCount = indexedPixels.length;
-        let curPixel = 0;
-        let ent = indexedPixels[curPixel++];
+    setCodeSize(codeSize) {
+        this.codeSize = codeSize;
+    }
 
-        const output = [];
-        let blocks = [];
-        let blockSize = 0;
-        let accum = 0;
-        let accBits = 0;
-
-        const writeCode = (code, size) => {
-            for (let i = size - 1; i >= 0; i--) {
-                accum |= ((code >> i) & 1) << accBits;
-                accBits++;
-                if (accBits === 8) {
-                    blocks.push(accum & 0xff);
-                    blockSize++;
-                    accum = 0;
-                    accBits = 0;
-                    if (blockSize === 255) {
-                        output.push(blockSize);
-                        for (const b of blocks) output.push(b);
-                        blocks = [];
-                        blockSize = 0;
+    write(code, codeSize) {
+        for (let i = 0; i < codeSize; i++) {
+            this.accumulator |= ((code >> i) & 1) << this.accBits;
+            this.accBits++;
+            if (this.accBits === 8) {
+                this.blocks.push(this.accumulator & 0xff);
+                this.blockSize++;
+                this.accumulator = 0;
+                this.accBits = 0;
+                if (this.blockSize === 255) {
+                    this.output.push(this.blockSize);
+                    for (const b of this.blocks) {
+                        this.output.push(b);
                     }
-                }
-            }
-        };
-
-        writeCode(clear, codeSize);
-
-        while (curPixel < pixelCount) {
-            const c = indexedPixels[curPixel++];
-            const fcode = (c << BITS) + ent;
-            let h = (c << 4) ^ ent;
-            let h2 = 2003 - (h % 2003);
-            let found = false;
-
-            while (true) {
-                if (hTab[h] === fcode) {
-                    ent = codTab[h];
-                    found = true;
-                    break;
-                }
-                if (hTab[h] < 0) break;
-                h -= h2;
-                if (h < 0) h += HSIZE;
-            }
-
-            if (!found) {
-                writeCode(ent, codeSize);
-                ent = c;
-                if (freeEntry < (1 << BITS)) {
-                    hTab[h] = fcode;
-                    codTab[h] = freeEntry++;
-                    if (freeEntry > maxCode) {
-                        codeSize++;
-                        highBit <<= 1;
-                        maxCode = highBit - 1;
-                    }
-                } else {
-                    writeCode(clear, codeSize);
-                    freeEntry = clear + 2;
-                    codeSize = minCodeSize + 1;
-                    highBit = 1 << codeSize;
-                    maxCode = highBit - 1;
-                    hTab.fill(-1);
+                    this.blocks = [];
+                    this.blockSize = 0;
                 }
             }
         }
+    }
 
-        writeCode(ent, codeSize);
-        writeCode(eofCode, codeSize);
-
-        if (accBits > 0) {
-            blocks.push(accum & 0xff);
-            blockSize++;
+    flush() {
+        if (this.accBits > 0) {
+            this.blocks.push(this.accumulator & 0xff);
+            this.blockSize++;
         }
-
-        if (blockSize > 0) {
-            output.push(blockSize);
-            for (const b of blocks) output.push(b);
+        if (this.blockSize > 0) {
+            this.output.push(this.blockSize);
+            for (const b of this.blocks) {
+                this.output.push(b);
+            }
         }
-
-        output.push(0);
-
-        for (const b of output) writeByte(b);
+        this.output.push(0);
     }
 }
