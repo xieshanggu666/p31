@@ -64,7 +64,7 @@ class GIFEncoder {
             writeByte(0x21);
             writeByte(0xf9);
             writeByte(4);
-            writeByte(0);
+            writeByte(4);
             writeShort(this.delay);
             writeByte(0);
             writeByte(0);
@@ -162,105 +162,83 @@ class GIFEncoder {
         const minCodeSize = 8;
         writeByte(minCodeSize);
 
-        const BITS = 12;
-        const HSIZE = 5003;
-        const clear = 1 << minCodeSize;
-        const eofCode = clear + 1;
-        let freeEntry = clear + 2;
+        const clearCode = 1 << minCodeSize;
+        const eofCode = clearCode + 1;
+        let nextCode = eofCode + 1;
         let codeSize = minCodeSize + 1;
-        let highBit = 1 << codeSize;
-        let maxCode = highBit - 1;
+        let maxCode = 1 << codeSize;
 
-        const hTab = new Int32Array(HSIZE);
-        const codTab = new Int32Array(HSIZE);
-        hTab.fill(-1);
+        const dict = new Map();
+        const resetDict = () => {
+            dict.clear();
+            for (let i = 0; i < clearCode; i++) {
+                dict.set(String(i), i);
+            }
+            nextCode = eofCode + 1;
+            codeSize = minCodeSize + 1;
+            maxCode = 1 << codeSize;
+        };
+        resetDict();
 
-        const pixelCount = indexedPixels.length;
-        let curPixel = 0;
-        let ent = indexedPixels[curPixel++];
+        let bitBuffer = 0;
+        let bitCount = 0;
+        const outputBytes = [];
 
-        const output = [];
-        let blocks = [];
-        let blockSize = 0;
-        let accum = 0;
-        let accBits = 0;
-
-        const writeCode = (code, size) => {
-            for (let i = size - 1; i >= 0; i--) {
-                accum |= ((code >> i) & 1) << accBits;
-                accBits++;
-                if (accBits === 8) {
-                    blocks.push(accum & 0xff);
-                    blockSize++;
-                    accum = 0;
-                    accBits = 0;
-                    if (blockSize === 255) {
-                        output.push(blockSize);
-                        for (const b of blocks) output.push(b);
-                        blocks = [];
-                        blockSize = 0;
-                    }
-                }
+        const writeCode = (code) => {
+            bitBuffer |= code << bitCount;
+            bitCount += codeSize;
+            while (bitCount >= 8) {
+                outputBytes.push(bitBuffer & 0xff);
+                bitBuffer >>= 8;
+                bitCount -= 8;
             }
         };
 
-        writeCode(clear, codeSize);
+        writeCode(clearCode);
 
-        while (curPixel < pixelCount) {
-            const c = indexedPixels[curPixel++];
-            const fcode = (c << BITS) + ent;
-            let h = (c << 4) ^ ent;
-            let h2 = 2003 - (h % 2003);
-            let found = false;
+        let current = String(indexedPixels[0]);
 
-            while (true) {
-                if (hTab[h] === fcode) {
-                    ent = codTab[h];
-                    found = true;
-                    break;
-                }
-                if (hTab[h] < 0) break;
-                h -= h2;
-                if (h < 0) h += HSIZE;
-            }
+        for (let i = 1; i < indexedPixels.length; i++) {
+            const pixel = indexedPixels[i];
+            const combined = current + ',' + pixel;
 
-            if (!found) {
-                writeCode(ent, codeSize);
-                ent = c;
-                if (freeEntry < (1 << BITS)) {
-                    hTab[h] = fcode;
-                    codTab[h] = freeEntry++;
-                    if (freeEntry > maxCode) {
+            if (dict.has(combined)) {
+                current = combined;
+            } else {
+                writeCode(dict.get(current));
+
+                if (nextCode < 4096) {
+                    dict.set(combined, nextCode++);
+                    if (nextCode > maxCode && codeSize < 12) {
                         codeSize++;
-                        highBit <<= 1;
-                        maxCode = highBit - 1;
+                        maxCode = 1 << codeSize;
                     }
                 } else {
-                    writeCode(clear, codeSize);
-                    freeEntry = clear + 2;
-                    codeSize = minCodeSize + 1;
-                    highBit = 1 << codeSize;
-                    maxCode = highBit - 1;
-                    hTab.fill(-1);
+                    writeCode(clearCode);
+                    resetDict();
                 }
+
+                current = String(pixel);
             }
         }
 
-        writeCode(ent, codeSize);
-        writeCode(eofCode, codeSize);
+        writeCode(dict.get(current));
+        writeCode(eofCode);
 
-        if (accBits > 0) {
-            blocks.push(accum & 0xff);
-            blockSize++;
+        if (bitCount > 0) {
+            outputBytes.push(bitBuffer & 0xff);
         }
 
-        if (blockSize > 0) {
-            output.push(blockSize);
-            for (const b of blocks) output.push(b);
+        let offset = 0;
+        while (offset < outputBytes.length) {
+            const blockSize = Math.min(255, outputBytes.length - offset);
+            writeByte(blockSize);
+            for (let i = 0; i < blockSize; i++) {
+                writeByte(outputBytes[offset + i]);
+            }
+            offset += blockSize;
         }
 
-        output.push(0);
-
-        for (const b of output) writeByte(b);
+        writeByte(0);
     }
 }

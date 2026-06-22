@@ -51,6 +51,7 @@ class ParticleSystem {
         };
 
         this.currentPresetName = null;
+        this.dpr = window.devicePixelRatio || 1;
 
         this.resize();
         this.initParticles();
@@ -60,8 +61,13 @@ class ParticleSystem {
 
     resize() {
         const rect = this.canvas.parentElement.getBoundingClientRect();
-        this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
+        this.dpr = window.devicePixelRatio || 1;
+        this.canvas.width = rect.width * this.dpr;
+        this.canvas.height = rect.height * this.dpr;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(this.dpr, this.dpr);
     }
 
     initParticles() {
@@ -909,7 +915,17 @@ class ParticleSystem {
     }
 
     takeScreenshot() {
-        const dataURL = this.canvas.toDataURL('image/png');
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        const width = Math.floor(rect.width);
+        const height = Math.floor(rect.height);
+
+        const offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        offscreenCtx.drawImage(this.canvas, 0, 0, width, height);
+
+        const dataURL = offscreenCanvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = `particle-art-${Date.now()}.png`;
         link.href = dataURL;
@@ -918,13 +934,21 @@ class ParticleSystem {
 
     async recordGif(duration = 3000, frameInterval = 100, onProgress) {
         const totalFrames = Math.floor(duration / frameInterval);
-        const width = this.canvas.width;
-        const height = this.canvas.height;
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        const width = Math.floor(rect.width);
+        const height = Math.floor(rect.height);
         const encoder = new GIFEncoder(width, height);
         encoder.setDelay(frameInterval);
 
+        const offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+
         for (let i = 0; i < totalFrames; i++) {
-            const imageData = this.ctx.getImageData(0, 0, width, height);
+            offscreenCtx.clearRect(0, 0, width, height);
+            offscreenCtx.drawImage(this.canvas, 0, 0, width, height);
+            const imageData = offscreenCtx.getImageData(0, 0, width, height);
             encoder.addFrame(imageData);
             if (onProgress) {
                 onProgress(i + 1, totalFrames);

@@ -427,15 +427,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const recordGifBtn = document.getElementById('recordGifBtn');
     const gifProgressOverlay = document.getElementById('gifProgressOverlay');
-    const gifProgressCurrent = document.getElementById('gifProgressCurrent');
-    const gifProgressTotal = document.getElementById('gifProgressTotal');
     const gifProgressBar = document.getElementById('gifProgressBar');
     const gifProgressPercent = document.getElementById('gifProgressPercent');
     let isRecording = false;
 
     const showGifProgress = (current, total) => {
-        gifProgressCurrent.textContent = current;
-        gifProgressTotal.textContent = total;
         const percent = Math.round((current / total) * 100);
         gifProgressBar.style.width = percent + '%';
         gifProgressPercent.textContent = percent + '%';
@@ -459,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             showGifOverlay();
             await system.recordGif(3000, 100, (current, total) => {
-                recordGifBtn.textContent = `🎬 录制中 ${current}/${total}`;
+                recordGifBtn.textContent = `🎬 录制中...`;
                 showGifProgress(current, total);
             });
         } catch (e) {
